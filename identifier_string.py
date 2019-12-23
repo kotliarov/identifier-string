@@ -289,7 +289,7 @@ def parse(input_str):
             retrun Variable object.
             Variable pattern: name(|transform)*
         """
-        offset, var_name = name(offset)
+        offset, var_name = match_name(offset)
         transforms = []
         while input_str[offset] == '|':
             offset, transform = match_transformation(offset + 1)
@@ -302,7 +302,7 @@ def parse(input_str):
 
             Transformation pattern: "|func_name(:parameter(,parameter)*)?
         """
-        offset, func_name = name(offset)
+        offset, func_name = match_name(offset)
         params = []
         if input_str[offset] == ':':
             offset, param = match_parameter(offset)
