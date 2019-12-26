@@ -270,7 +270,6 @@ class Chain(object):
 class Polymers(object):
     """ SPL document polymers / irregular AA.
     """
-    xpath_moiety = "./x:moiety[x:code[@code=\"C118424\"]]"
     xpath_localid = "./x:code/@code"
 
     def __init__(self, doc):
@@ -374,6 +373,84 @@ class Polymer(object):
         return ",".join([x.to_string() for x in self.conn_points])
 
 
+class Modifcations(object):
+    
+    xpath_moiety = "./x:moiety[x:code[@code=\"C118425\"]]/partMoiety" 
+
+    def __init__(self, doc):
+        """ 
+        """
+        self._counter = 0
+        self._pos = 0
+        self.polymers = []
+        self._load(doc)
+
+    def _load(self, doc):
+        substance = doc.substance()
+        nodes = substance.xpath(self.xpath_moiety, namespaces=doc.NAMESPACES)
+        for node in nodes:
+            code = node.xpath("./x:code/@code", namespaces=doc.NAMESPACES)
+            if len(code) != 1:
+                raise SPLDocumentError("Moiety substance code not found")
+            bonds = node.xpath("./x:bond[x:code[@code=\"C118426\"]]") # AA substitutions
+            if bonds:
+                self.mods.append(Substitution(code, bonds))
+            bonds = node.xpath("./x:bond[x:code[@code=\"C14050\"]]") # Attachments
+            if bonds:
+                self.mods.append(Attachment(code, bonds))
+
+    def __iter__(self):
+        self._pos = 0
+        return self
+
+    def __next__(self):
+        if self._pos < len(self.mods):
+            i = self.pos_
+            self.pos_ += 1
+            return self.mods[i]
+        else:
+            raise StopIteration() 
+
+
+class AminoAcidSubstitution(object):
+    def __init__(self, bonds, irreg_aa, chains_lookup):
+        self.bonds = []
+        self._load(bonds, irreg_aa, chains_lookup)
+
+    def _load(self, bonds, irreg_aa, chains_lookup):
+        """
+        """
+        for bond in bonds:
+            local_id = bond.xpath("./x:distalMoiety/x:id/@extension")[0]
+            self.chain = chain_lookup(local_id)
+            positions = bond.xpath("./x:positionNumber/@value")
+            if len(positions) != 2:
+                raise SPLDocumentError("Expecting two position per bond")
+            positions = map(int, positions)
+            self.bonds.append(Bond(irreg_aa, positions[0], chain, positions[1]))
+        self.bonds = sorted(self.bonds, key=lambda x: (x.irreg_aa.name, x.irreg_aa_pos, x.chain.name, x.chain_pos))
+
+    def to_string(self):
+        return "sub:" + ",".join([x.to_string() for x in self.bonds])
+
+    @property
+    def value(self):
+        return self.to_string()
+
+
+class Bond(object):
+    def __init__(self, irreg_aa, irreg_aa_pos, chain, chain_pos):
+        self.irreg_aa = irreg_aa
+        self.irreg_aa_pos = irreg_aa_pos
+        self.chain = chain
+        self.chain_pos = chain_pos
+
+    def to_string(self):
+        return "{}:{}:{}:{}".format(self.irreg_aa.name,
+                                    self.irreg_aa_pos,
+                                    self.chain.name,
+                                    self.chain_pos)
+
 CHEMICAL_STRUCT = [
     ("x-inchi-key", "./x:subjectOf/x:characteristic[x:code[@code=\"C103240\"]]/x:value[@mediaType=\"application/x-inchi-key\"]/text()"),
     ("x-inchi", "./x:subjectOf/x:characteristic[x:code[@code=\"C103240\"]]/x:value[@mediaType=\"application/x-inchi\"]/text()"),
@@ -383,7 +460,7 @@ CHEMICAL_STRUCT = [
 ]
 
 def get_chem_structure(moiety, mediaType, namespaces=SplDocument.NAMESPACES):
-    """ Return chemocal struct balue.
+    """ Return chemical struct balue.
         :moiety: xml dom element 
         :mediaType: concrete mediaType or None if any
     """
