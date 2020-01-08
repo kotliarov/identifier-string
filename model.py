@@ -5,7 +5,10 @@ class SplModelProtein(object):
     def __init__(self, xmldoc):
         self.chains = Chains(xmldoc)
         self.polymers = Polymers(xmldoc)
-        self.modifications = []
+        self.modifications = Modifications(xmldoc,
+                                           lambda x: self.chains[x],  # chain lookup by local id
+                                           lambda x: self.polymers[x] # irreg AA lookup by code
+                                           )
 
     def accept(self, visitor):
         """
@@ -13,7 +16,8 @@ class SplModelProtein(object):
         """
         visitor.visit("chains", self.chains)
         visitor.visit("polymers", self.polymers)
-        visitor.visit("modifications", self.modifications)
+        visitor.visit("substitutions", self.modifications.substitutions)
+        visitor.visit("attachments", self.modifications.attachments)
 
 
 class Chains(object):
@@ -183,29 +187,38 @@ class Polymer(object):
 
 
 class Modifications(object):
-    xpath_moiety = "./x:moiety[x:code[@code=\"C118425\"]]/partMoiety"
+    xpath_moiety = "./x:moiety[x:code[@code=\"C118425\"]]/x:partMoiety"
 
-    def __init__(self, doc):
+    def __init__(self, doc, chain_lookup, polymer_lookup):
         """
         """
         self._counter = 0
         self._pos = 0
-        self.mods = []
-        self._load(doc)
+        self.substitutions = []
+        self.attachments = []
+        self._load(doc, chain_lookup, polymer_lookup)
+        self.substitutions = sorted(self.substitutions, key=lambda x: [x.chain, x.position, x.polymer, x.connection_point])
+        self.attachments = sorted(self.attachments, key=lambda x: [x.chain, x.position, x.glycan])
 
-    def _load(self, doc):
+    def _load(self, doc, chain_lookup, polymer_lookup):
         substance = doc.substance()
         nodes = substance.xpath(self.xpath_moiety, namespaces=doc.NAMESPACES)
         for node in nodes:
-            code = node.xpath("./x:code/@code", namespaces=doc.NAMESPACES)
+            code = node.xpath("./x:code/@code", namespaces=doc.NAMESPACES) # Moiety substance, irreg. AA code
             if len(code) != 1:
                 raise SPLDocumentError("Moiety substance code not found")
-            bonds = node.xpath("./x:bond[x:code[@code=\"C118426\"]]")  # AA substitutions
+            code = code[0]
+            bonds = node.xpath("./x:bond[x:code[@code=\"C118426\"]]", namespaces=doc.NAMESPACES)  # AA substitutions
             if bonds:
-                self.mods.append(Substitution(code, bonds))
-            bonds = node.xpath("./x:bond[x:code[@code=\"C14050\"]]")  # Attachments
+                for point in make_substitution_points(doc, bonds, 
+                                                       polymer_lookup(code),
+                                                       chain_lookup):
+                    self.substitutions.append(point)
+
+            bonds = node.xpath("./x:bond[x:code[@code=\"C14050\"]]", namespaces=doc.NAMESPACES)  # Attachments
             if bonds:
-                self.mods.append(Attachment(code, bonds))
+                for point in make_attachment_points(doc, code, bonds, chain_lookup):
+                    self.attachments.append(point)
 
     def __iter__(self):
         self._pos = 0
@@ -220,45 +233,86 @@ class Modifications(object):
             raise StopIteration()
 
 
-class AminoAcidSubstitution(object):
-    def __init__(self, bonds, irreg_aa, chains_lookup):
-        self.bonds = []
-        self._load(bonds, irreg_aa, chains_lookup)
+def make_substitution_points(doc, bonds, irreg_aa, chain_lookup):
+    """
+    """
+    for bond in bonds:
+        local_id = bond.xpath("./x:distalMoiety/x:id/@extension", namespaces=doc.NAMESPACES)[0]
+        chain = chain_lookup(local_id)
+        positions = bond.xpath("./x:positionNumber/@value", namespaces=doc.NAMESPACES)
+        if len(positions) != 2:
+            raise SPLDocumentError("Expecting two position per bond")
+        positions = list(map(int, positions))
+        yield SubstitutionPoint(irreg_aa, positions[0], chain, positions[1])
 
-    def _load(self, bonds, irreg_aa, chains_lookup):
-        """
-        """
-        for bond in bonds:
-            local_id = bond.xpath("./x:distalMoiety/x:id/@extension")[0]
-            self.chain = chain_lookup(local_id)
-            positions = bond.xpath("./x:positionNumber/@value")
-            if len(positions) != 2:
-                raise SPLDocumentError("Expecting two position per bond")
-            positions = map(int, positions)
-            self.bonds.append(Bond(irreg_aa, positions[0], chain, positions[1]))
-        self.bonds = sorted(self.bonds, key=lambda x: (x.irreg_aa.name, x.irreg_aa_pos, x.chain.name, x.chain_pos))
 
-    def to_string(self):
-        return "sub:" + ",".join([x.to_string() for x in self.bonds])
+def make_attachment_points(doc, glycan_code, bonds, chain_lookup):
+    if len(bonds) != 1:
+        raise SPLDocumentError("Expecting one amino acid substitution point element")
+
+    for bond in bonds:
+        local_id = bond.xpath("./x:distalMoiety/x:id/@extension", namespaces=doc.NAMESPACES)[0]
+        self.chain = chain_lookup(local_id)
+        positions = bond.xpath("./x:positionNumber/@value", namespaces=doc.NAMESPACES)
+        if len(positions) != 1:
+            raise SPLDocumentError("Expecting one attachment position")
+        yield AttachmentPoint(glycan_code, chain, int(positions[0]))
+
+
+class SubstitutionPoint(object):
+    def __init__(self, irreg_aa, cp_index, chain, chain_pos):
+        self._irreg_aa = irreg_aa
+        self._connection_point = cp_index
+        self._chain = chain
+        self._position = chain_pos # position on protein chain
+        self._value = None
+
+    @property
+    def chain(self):
+        return self._chain.name
+
+    @property
+    def position(self):
+        return self._position
+
+    @property
+    def polymer(self):
+        return self._irreg_aa.name
+
+    @property
+    def connection_point(self):
+        return self._connection_point
 
     @property
     def value(self):
-        return self.to_string()
+        if self._value is None:
+            self._value = "{}:{}:{}:{}".format(self.chain, self.position, self.polymer, self.connection_point)
+        return self._value
+   
+class AttachmentPoint(object):
+    def __init__(self, glycan_code, chain, chain_pos):
+        self._glycan_code = glycan_code
+        self._chain = chain
+        self._position = chain_pos
+        self._value = None
 
+    @property
+    def chain(self):
+        return self._chain.name
 
-class Bond(object):
-    def __init__(self, irreg_aa, irreg_aa_pos, chain, chain_pos):
-        self.irreg_aa = irreg_aa
-        self.irreg_aa_pos = irreg_aa_pos
-        self.chain = chain
-        self.chain_pos = chain_pos
+    @property
+    def position(self):
+        return self._position
 
-    def to_string(self):
-        return "{}:{}:{}:{}".format(self.irreg_aa.name,
-                                    self.irreg_aa_pos,
-                                    self.chain.name,
-                                    self.chain_pos)
+    @property
+    def glycan(self):
+        return self._glycan_code
 
+    @property
+    def value(self):
+        if self._value is None:
+            self._value = "{}:{}:[}".format(self.chain, self.position, self.glycan)
+        return self._value
 
 CHEMICAL_STRUCT = [
     ("x-inchi-key",

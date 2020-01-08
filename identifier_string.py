@@ -117,8 +117,10 @@ class IdentifierStringTemplate(object):
             self.visit_chains(target)
         elif name == "polymers":
             self.visit_polymers(target)
-        elif name == "modifications":
-            self.visit_modifications(target)
+        elif name == "substitutions":
+            self.visit_substitutions(target)
+        elif name == "attachments":
+            self.visit_attachments(target)
         else:
             pass
 
@@ -140,14 +142,24 @@ class IdentifierStringTemplate(object):
             t.load(polymer)
             self.context["polymers"].append(t)
 
-    def visit_modifications(self, target):
+    def visit_substitutions(self, target):
         """
         """
-        self.context["modifications"] = []
+        self.context["substitutions"] = []
         for modification in target:
-            t = self.templates.make_instance_of("modification")
+            t = self.templates.make_instance_of("substitution")
             t.load(modification)
-            self.context["modifications"].append(t)
+            self.context["substitutions"].append(t)
+
+    def visit_attachments(self, target):
+        """
+        """
+        self.context["attcahments"] = []
+        for modification in target:
+            t = self.templates.make_instance_of("attachment")
+            t.load(modification)
+            self.context["attachments"].append(t)
+
 
     def to_string(self, template_str):
         """ Make identifier string using specified template.
@@ -196,6 +208,8 @@ class TextGeneratorElementVariable(object):
         
         if isinstance(item, str):
             return item
+        elif isinstance(item, int):
+            return str(item)
         elif isinstance(item, list):
             coll = [x.to_string() for x in item]
             return ";".join(coll)
@@ -368,7 +382,7 @@ class StringTemplate(object):
 Rules = {
     "protein_identifier" : {
         "attributes" : ["chains", "polymers", "modifications", "substitutions", "attachments"],
-        "str": '/chains={{ chains|sort|join:";" }}/poly={{ polymers|sort|join:";" }}/mods={{ modifications|sort|join:";" }}'
+        "str": '/chains={{ chains|sort|join:";" }}/poly={{ polymers|sort|join:";" }}/subs={{ substitutions|sort|join:";" }}'
     },
     "chain" : {
         "attributes" : ["name", "value"],
@@ -378,13 +392,13 @@ Rules = {
         "attributes" : ["name", "value", "connection_points"],
         "str" : "{{ name }}:{{ value }}:{{ connection_points }}"
     },
-    "modification" : {
-        "attributes" : ["name", "chain", "position", "type"],
-        "str" : "{{ name }}:{{ chain }}:{{ position }}:{{ type }}"
-    },
     "substitution" : {
-        "attributes" : ["name", "modification", "polymer", "connection_point", "index"],
-        "str" : "{{ name }}:{{ modification }}:{{ polymer }}:{{ connection_point }}:{{ index }}"
+        "attributes" : ["chain", "position", "polymer", "connection_point"],
+        "str" : "{{ chain }}:{{ position }}:{{ polymer }}:{{ connection_point }}"
+    },
+    "attchment" : {
+        "attributes" : ["chain", "position", "glycan"],
+        "str" : "{{ chain }}:{{ position }}:{{ glycan }}"
     }
 }
 
