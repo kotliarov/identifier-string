@@ -225,18 +225,6 @@ class Modifications(object):
                 for point in make_attachment_points(doc, code, bonds, chain_lookup):
                     self.attachments.append(point)
 
-    def __iter__(self):
-        self._pos = 0
-        return self
-
-    def __next__(self):
-        if self._pos < len(self.mods):
-            i = self.pos_
-            self.pos_ += 1
-            return self.mods[i]
-        else:
-            raise StopIteration()
-
 
 def make_substitution_points(doc, bonds, irreg_aa, chain_lookup):
     """
