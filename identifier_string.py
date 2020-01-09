@@ -154,7 +154,7 @@ class IdentifierStringTemplate(object):
     def visit_attachments(self, target):
         """
         """
-        self.context["attcahments"] = []
+        self.context["attachments"] = []
         for modification in target:
             t = self.templates.make_instance_of("attachment")
             t.load(modification)
