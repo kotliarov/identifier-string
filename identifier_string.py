@@ -393,8 +393,8 @@ Rules = {
         "str" : "{{ name }}:{{ value }}:{{ connection_points }}"
     },
     "substitution" : {
-        "attributes" : ["chain", "position", "polymer", "connection_point"],
-        "str" : "{{ chain }}:{{ position }}:{{ polymer }}:{{ connection_point }}"
+        "attributes" : ["name", "chain", "position", "polymer", "connection_point"],
+        "str" : "{{ name }}:{{ chain }}:{{ position }}:{{ polymer }}:{{ connection_point }}"
     },
     "attchment" : {
         "attributes" : ["chain", "position", "glycan"],

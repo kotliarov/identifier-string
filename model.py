@@ -16,7 +16,7 @@ class SplModelProtein(object):
         """
         visitor.visit("chains", self.chains)
         visitor.visit("polymers", self.polymers)
-        visitor.visit("substitutions", self.modifications.substitutions)
+        visitor.visit("substitutions", self.modifications.sub_points)
         visitor.visit("attachments", self.modifications.attachments)
 
 
@@ -197,8 +197,13 @@ class Modifications(object):
         self.substitutions = []
         self.attachments = []
         self._load(doc, chain_lookup, polymer_lookup)
-        self.substitutions = sorted(self.substitutions, key=lambda x: [x.chain, x.position, x.polymer, x.connection_point])
-        self.attachments = sorted(self.attachments, key=lambda x: [x.chain, x.position, x.glycan])
+        self.substitutions = sorted(self.substitutions)
+        for index, sub in enumerate(self.substitutions):
+            sub.set_name("sub{}".format(index))
+        self.sub_points = []
+        for sub in self.substitutions:
+            self.sub_points.extend(sub.points)
+        self.attachments = sorted(self.attachments)
 
     def _load(self, doc, chain_lookup, polymer_lookup):
         substance = doc.substance()
@@ -210,10 +215,10 @@ class Modifications(object):
             code = code[0]
             bonds = node.xpath("./x:bond[x:code[@code=\"C118426\"]]", namespaces=doc.NAMESPACES)  # AA substitutions
             if bonds:
-                for point in make_substitution_points(doc, bonds, 
+                    sub = make_substitution_points(doc, bonds, 
                                                        polymer_lookup(code),
-                                                       chain_lookup):
-                    self.substitutions.append(point)
+                                                       chain_lookup)
+                    self.substitutions.append(sub)
 
             bonds = node.xpath("./x:bond[x:code[@code=\"C14050\"]]", namespaces=doc.NAMESPACES)  # Attachments
             if bonds:
@@ -236,6 +241,7 @@ class Modifications(object):
 def make_substitution_points(doc, bonds, irreg_aa, chain_lookup):
     """
     """
+    points = []
     for bond in bonds:
         local_id = bond.xpath("./x:distalMoiety/x:id/@extension", namespaces=doc.NAMESPACES)[0]
         chain = chain_lookup(local_id)
@@ -243,7 +249,8 @@ def make_substitution_points(doc, bonds, irreg_aa, chain_lookup):
         if len(positions) != 2:
             raise SPLDocumentError("Expecting two position per bond")
         positions = list(map(int, positions))
-        yield SubstitutionPoint(irreg_aa, positions[0], chain, positions[1])
+        points.append(SubstitutionPoint(irreg_aa, positions[0], chain, positions[1]))
+    return Substitution(points)
 
 
 def make_attachment_points(doc, glycan_code, bonds, chain_lookup):
@@ -257,6 +264,25 @@ def make_attachment_points(doc, glycan_code, bonds, chain_lookup):
         if len(positions) != 1:
             raise SPLDocumentError("Expecting one attachment position")
         yield AttachmentPoint(glycan_code, chain, int(positions[0]))
+
+
+class Substitution(object):
+    def __init__(self, points):
+        self._points = sorted(points)
+
+    @property
+    def points(self):
+        return self._points
+
+    def set_name(self, value):
+        for p in self._points:
+            p.name = value
+
+    def __lt__(self, other):
+        for lhs, rhs in zip(self._points, other._points):
+            if rhs < lhs:
+                return False
+        return True
 
 
 class SubstitutionPoint(object):
@@ -288,6 +314,34 @@ class SubstitutionPoint(object):
         if self._value is None:
             self._value = "{}:{}:{}:{}".format(self.chain, self.position, self.polymer, self.connection_point)
         return self._value
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+
+    def __lt__(self, other):
+        if self.polymer < other.polymer:
+            return True
+        elif self.polymer > other.polymer:
+            return False
+        if self.connection_point < other.connection_point:
+            return True
+        elif self.connection_point > other.connection_point:
+            return False
+        if self.chain < other.chain:
+            return True
+        elif self.chain > other.chain:
+            return False
+        if self.position < other.position:
+            return True
+        elif self.position > other.position:
+            return False
+        return False
+
    
 class AttachmentPoint(object):
     def __init__(self, glycan_code, chain, chain_pos):
@@ -313,6 +367,22 @@ class AttachmentPoint(object):
         if self._value is None:
             self._value = "{}:{}:[}".format(self.chain, self.position, self.glycan)
         return self._value
+
+    def __lt__(self, other):
+        if self.glycan < other.glycan:
+            return True
+        elif self.glycan > other.glycan:
+            return False
+        if self.chain < other.chain:
+            return True
+        elif self.chain > other.chain:
+            return False
+        if self.position < other.position:
+            return True
+        elif self.position > other.position:
+            return False
+        return False
+
 
 CHEMICAL_STRUCT = [
     ("x-inchi-key",
