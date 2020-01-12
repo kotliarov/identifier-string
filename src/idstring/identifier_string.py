@@ -97,8 +97,8 @@
 import sys
 
 
-from spl import SplDocument
-from model import SplModelProtein
+from idstring.spl import SplDocument
+from idstring.model import SplModelProtein
 
 
 class IdentifierStringTemplate(object):

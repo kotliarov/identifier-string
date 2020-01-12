@@ -1,4 +1,4 @@
-from spl import SplDocument, SPLDocumentError
+from idstring.spl import SplDocument, SPLDocumentError
 
 
 class SplModelProtein(object):
