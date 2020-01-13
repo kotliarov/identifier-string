@@ -401,7 +401,6 @@ Rules = {
 }
 
 
-
 if __name__ == '__main__':
     docpath = sys.argv[1]
     identifier = IdentifierStringTemplate(Templates(Rules))
