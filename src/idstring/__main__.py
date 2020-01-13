@@ -10,5 +10,5 @@ if __name__ == "__main__":
     identifier = IdentifierStringTemplate(Templates(Rules))
     model = SplModelProtein(SplDocument(docpath))
     model.accept(identifier)
-    print(identifier.to_string(Rules["protein_identifier"]["str"]))
+    print(identifier.to_string(Rules["protein_identifier"]))
 

@@ -41,15 +41,16 @@ class Chains(object):
         """
         substance = doc.substance()
         nodes = substance.xpath(self.xpath_moiety, namespaces=doc.NAMESPACES)
-        for node in nodes:
-            local_id = node.xpath(self.xpath_localid, namespaces=doc.NAMESPACES)
+        for moiety in nodes:
+            local_id = moiety.xpath(self.xpath_localid, namespaces=doc.NAMESPACES)
             if not local_id:
                 raise SPLDocumentError("local id not found")
 
-            value = node.xpath(self.xpath_aa, namespaces=doc.NAMESPACES)
+            value = moiety.xpath(self.xpath_aa, namespaces=doc.NAMESPACES)
             if not value:
                 raise SPLDocumentError("Polypeptide chain AA sequence not found")
-            self.chains.append(Chain(local_id[0], value[0]))
+            quantity = get_quantity(moiety)
+            self.chains.append(Chain(local_id[0], value[0], quantity))
         self.chains = sorted(self.chains, key=lambda x: (x.value, x.local_id))
         for index, chain in enumerate(self.chains):
             chain.name = "chain{}".format(self._counter)
@@ -75,9 +76,10 @@ class Chains(object):
 
 
 class Chain(object):
-    def __init__(self, local_id, value):
+    def __init__(self, local_id, value, quantity):
         self.local_id = local_id
         self.value = value
+        self.quantity = quantity
         self.name = None
 
 
@@ -95,7 +97,7 @@ class Polymers(object):
         self._load(doc)
 
     def _load(self, doc):
-        """ Load polymers / irrgegula AA moleculs defined in the SPL XML document (other substance(s)).
+        """ Load polymers / irregular AA moleculs defined in the SPL XML document (other substance(s)).
         :doc: SPL XML DOM object
         """
 
@@ -134,7 +136,7 @@ class Polymers(object):
             points = []
             nodes = subject.xpath("./x:moiety[x:code[@code=\"C118427\"]]", namespaces=doc.NAMESPACES)
             for node in nodes:
-                positions = node.xpath("./x:positionNumber/@value", namespaces=doc.NAMESPACES)
+                positions = node.xpath("./x:positionNumber[@value]/@value|./x:positionNumber[@nullFlavor]/@nullFlavor", namespaces=doc.NAMESPACES)
                 points.append(ConnectionPoint(positions[0], positions[1]))
             return points
 
@@ -418,7 +420,7 @@ def get_quantity(moiety, namespaces=SplDocument.NAMESPACES):
             self.unit = unit
 
         def to_string(self):
-            return "{}:{}:{}".format(self.num, self.denom.self.unit)
+            return "{}:{}:{}".format(self.num, self.denom, self.unit)
 
     class QuanityRange(object):
         def __init__(self, low, low_inclusive, high, high_inclusive, denom, unit):

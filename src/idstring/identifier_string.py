@@ -40,7 +40,7 @@
 
                 2. Model.
                 A model component represents SPL XML document instance.
-                A visitor pattern will be used to to navigate SP document model's structure and collect
+                A visitor pattern will be used to to navigate SPL document model's structure and collect
                 data necessary to make an identifier string:
                 
                 ```
@@ -185,6 +185,12 @@ class TextGenerator(object):
         """
         return ''.join([x.to_string(context) for x in self.nodes])
 
+    def variable_names(self):
+        """ Return collection of variable names.
+        """
+        return [x.variable.name for x in self.nodes 
+                if isinstance(x, TextGeneratorElementVariable)]
+
 
 class TextGeneratorElementString(object):
     def __init__(self, value):
@@ -218,7 +224,11 @@ class TextGeneratorElementVariable(object):
 
 
 def parse(input_str):
-    """
+    """ Return collection of elements that represent 
+        specified template string.
+        Elements could be of two types:
+        - TextGeneratorElementString
+        - TextGeneratorElementVariable
     """
     class Variable(object):
         def __init__(self, name, transforms):
@@ -339,10 +349,12 @@ class TemplateParserError(Exception):
 class Templates(object):
     def __init__(self, rules):
         self.rules = rules
+        self.generators = { t: TextGenerator(t) for _, t in rules.items()}
 
     def make_instance_of(self, name):
         if name in self.rules:
-            return StringTemplate(self.rules[name].copy())
+            template = self.rules[name]
+            return StringTemplate(template, self.generators[template])
         else:
             raise KeyError(name)
 
@@ -350,9 +362,10 @@ class Templates(object):
 class StringTemplate(object):
     """
     """
-    def __init__(self, template):
-        self.attributes = template["attributes"]
-        self.string_template = template["str"]
+    def __init__(self, template, generator):
+        self.attributes = generator.variable_names()
+        self.string_template = template
+        self.generaor = generator
         self._context = {}
 
     def load(self, target):
@@ -380,52 +393,13 @@ class StringTemplate(object):
 
 
 Rules = {
-    "protein_identifier" : {
-        "attributes" : ["chains", "polymers", "modifications", "substitutions", "attachments"],
-        "str": '/chains={{ chains|sort|join:";" }}/poly={{ polymers|sort|join:";" }}/subs={{ substitutions|sort|join:";" }}'
-    },
-    "chain" : {
-        "attributes" : ["name", "value"],
-        "str" : "{{ name }}:{{ value }}"
-    },
-    "polymer" : {
-        "attributes" : ["name", "value", "connection_points"],
-        "str" : "{{ name }}:{{ value }}:{{ connection_points }}"
-    },
-    "substitution" : {
-        "attributes" : ["name", "chain", "position", "polymer", "connection_point"],
-        "str" : "{{ name }}:{{ chain }}:{{ position }}:{{ polymer }}:{{ connection_point }}"
-    },
-    "attchment" : {
-        "attributes" : ["chain", "position", "glycan"],
-        "str" : "{{ chain }}:{{ position }}:{{ glycan }}"
-    }
+    "protein_identifier" : "/chains={{ chains }}/poly={{ polymers }}/subs={{ substitutions }}",
+    "chain" : "{{ name }}:{{ value }}",
+    "polymer" : "{{ name }}:{{ value }}:{{ connection_points }}",
+    "substitution" : "{{ name }}:{{ chain }}:{{ position }}:{{ polymer }}:{{ connection_point }}",
+    "attachment" :  "{{ chain }}:{{ position }}:{{ glycan }}",
 }
 
-
-class MockModel(object):
-    def __init__(self):
-        pass
-
-    def accept(self, visitor):
-        """
-        """
-        chains = [MockChain("c1", "A"), MockChain("c2", "AA"), MockChain("c3", "ABC")]
-        visitor.visit("chains", chains)
-
-        polymers = [MockPoly("poly1", "A"), MockPoly("poly2", "AA")]
-        visitor.visit("polymers", polymers)
-
-
-class MockChain(object):
-    def __init__(self, name, value):
-        self.name = name
-        self.value = value
-
-class MockPoly(object):
-    def __init__(self, name, value):
-        self.name = name
-        self.value = value
 
 
 if __name__ == '__main__':
@@ -433,9 +407,7 @@ if __name__ == '__main__':
     identifier = IdentifierStringTemplate(Templates(Rules))
     model = SplModelProtein(SplDocument(docpath))
     model.accept(identifier)
-    #mock_model = MockModel()
-    #mock_model.accept(identifier)
-    print(identifier.to_string(Rules["protein_identifier"]["str"]))
+    print(identifier.to_string(Rules["protein_identifier"]))
     
 
 
