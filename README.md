@@ -18,13 +18,13 @@ Nested template hierarchy can be created by injecting templates as variables int
 3. A template contains variables, which get replaced with values when the template is rendered/evaluated.
 
 Examples of string templates::
-{
+```
     "protein_identifier" : "/chains={{ chains }}/poly={{ polymers }}/subs={{ substitutions }}",
     "chain" : "{{ name }}:{{ value }}:{{ quantity }}",
     "polymer" : "{{ name }}:{{ value }}:{{ connection_points }}:{{ quantity }}",
     "substitution" : "{{ name }}:{{ chain }}:{{ position }}:{{ polymer }}:{{ connection_point }}",
     "attachment" :  "{{ chain }}:{{ position }}:{{ glycan }}",
-}
+```
 
 
 ### Variables
