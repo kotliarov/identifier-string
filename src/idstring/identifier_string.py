@@ -15,26 +15,11 @@
                Example:
 
                {
-                    "protein_identifier" : {
-                                            "attributes" : ["chains", "polymers", "modifications", "substitutions", "attachments"],
-                                            "str": "/chains={{ chains|sort|join:";" }}/poly={{ polymers|sort|join:";" }}/mods={{ modifications|sort|join:";" }}"
-                    },
-                    "chain" : {
-                        "attributes" : ["name", "value"],
-                        "str" : "{{ name }}:{{ value }}"
-                    },
-                    "polymer" : {
-                        "attributes" : ["name", "value"],
-                        "str" : "{{ name }}:{{ value }}"
-                    },
-                    "modification" : {
-                        "attributes" : ["name", "chain", "position", "type"],
-                        "str" : "{{ name }}:{{ chain }}:{{ position }}:{{ type }}"
-                    },
-                    "substitution" : {
-                        "attributes" : ["name", "modification", "polymer", "connection_point", "index"],
-                        "str" : "{{ name }}:{{ modification }}:{{ polymer }}:{{ connection_point }}:{{ index }}"
-                    }
+                    "protein_identifier" : "/chains={{ chains|sort|join:";" }}/poly={{ polymers|sort|join:";" }}/mods={{ modifications|sort|join:";" }}",
+                    "chain" : "{{ name }}:{{ value }}",
+                    "polymer" : "{{ name }}:{{ value }}",
+                    "modification": "{{ name }}:{{ chain }}:{{ position }}:{{ type }}",
+                    "substitution" : "{{ name }}:{{ modification }}:{{ polymer }}:{{ connection_point }}:{{ index }}"
 
                 }
 
