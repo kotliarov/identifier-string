@@ -105,3 +105,13 @@ cd identifier-string
 pip install .
 python -m idstring ./protein.xml
 ```
+
+Windows:
+```
+git clone https://github.com/kotliarov/identifier-string.git
+virtualenv  env3
+env3\Scripts\activate.bat
+cd identifier-string
+pip install .
+python -m idstring ./protein.xml
+```
